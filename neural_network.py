@@ -10,7 +10,7 @@ import activations
 from losses import quadratic
 
 
-# cmd : python neural_network.py 784 30 10 TrainDigitX.csv.gz TrainDigitY.csv.gz TestDigitX.csv.gz PredictDigitY.csv.gz
+# cmd : python neural_network.py 784 30 10 TrainDigitX.csv.gz TrainDigitY.csv.gz TestDigitX.csv.gz TestDigitY.csv.gz PredictDigitY.csv.gz
 
 # cmd : python neural_network.py 784 30 10 TestDigitX.csv.gz TestDigitY.csv.gz TrainDigitX.csv.gz PredictDigitY.csv.gz
 
@@ -25,6 +25,8 @@ class MultilayerPerceptron:
         self.epochs = epochs
         self.batchsize = batchsize
         self.learningrate = learningrate
+        self.weights = {}
+        self.bias = {}
         self.inference = False
         self.savePrediction = False
         self.count = 0
@@ -35,7 +37,8 @@ class MultilayerPerceptron:
         self.predictionList = []
         self.main()
 
-    def data(self, trainset, trainset_label):
+    @staticmethod
+    def data(trainset, trainset_label):
         """
         Reads in the data from files specified by command line arguments
 
@@ -71,7 +74,7 @@ class MultilayerPerceptron:
             print("Incorrect key value passed to variable function. No matrix was returned.")
 
     @staticmethod
-    def one_hot_encoding(self, input_label_batch):
+    def one_hot_encoding(input_label_batch):
         """
         Converts the label to one hot encoding
         return: one hot array of label
@@ -94,10 +97,10 @@ class MultilayerPerceptron:
         z1 = activations.sigmoid(z1_sum, 'normal')
         
         # Hidden Layer 2
-        #z2 = activations.sigmoid((np.einsum('ij, j->i', self.weights['hidden2'], z1) + self.bias['hidden2']), 'normal')
+        # z2 = activations.sigmoid((np.einsum('ij, j->i', self.weights['hidden2'], z1) + self.bias['hidden2']), 'normal')
 
         # Output Layer
-        out_sum = np.matmul( self.weights['out'].T, z1) + self.bias['out']
+        out_sum = np.matmul(self.weights['out'].T, z1) + self.bias['out']
         
         prediction = activations.softmax(out_sum, 'normal')
 
@@ -129,7 +132,9 @@ class MultilayerPerceptron:
 
     def mini_batch(self, input_data_batch, input_label_batch):
         """
-        Controls the process of feeding through and backpropagating the network by passing individual examples from the minibatch
+        Controls the process of feeding through and
+        backpropagating the network by passing individual examples from the mini_batch.
+
         Calculates the error for each batch
         """
         cores = cpu_count()
@@ -137,7 +142,6 @@ class MultilayerPerceptron:
         i = 0
         
         error_avg = 0
-        gradientAvg = 0
         processes = []
         
         '''for row in input_data_batch:
@@ -150,11 +154,11 @@ class MultilayerPerceptron:
             pool = Pool(processes=cpuCount)
             parallelBatch = pool.apply_async(self.feedforward, (input_data_batch,))
             prediction, outsum, h1, h1_sum = parallelBatch.get(timeout=1)'''
-        #gradientAvg = np.zeros()
+
         self.outGradientAvg = np.zeros((self.layers[-1], self.layers[1]), dtype=float)
         self.hiddenGradientAvg = np.zeros((self.layers[0], self.layers[1]), dtype=float)
-        self.biasOutGradientAvg = np.zeros((1,10),dtype=float)
-        self.biasHiddenGradientAvg = np.zeros((30,),dtype=float)
+        self.biasOutGradientAvg = np.zeros((1, 10), dtype=float)
+        self.biasHiddenGradientAvg = np.zeros((30,), dtype=float)
 
         for row in input_data_batch:
             row = np.array(row)
@@ -164,20 +168,17 @@ class MultilayerPerceptron:
             prediction, outsum, h1, h1_sum = self.feedforward(row)
             error_avg += quadratic(prediction, encoded_labels[i], 'normal')
             
-            if self.inference == False:
-                outGradient, hiddenGradient = self.backpropagate(prediction, encoded_labels[i], h1, row)
-                self.outGradientAvg += outGradient
-                self.hiddenGradientAvg += hiddenGradient
-                #self.updateWeights(self.outGradientAvg/self.batchsize, self.hiddenGradientAvg/self.batchsize)
+            if not self.inference:
+                out_gradient, hidden_gradient = self.backpropagate(prediction, encoded_labels[i], h1, row)
+                self.outGradientAvg += out_gradient
+                self.hiddenGradientAvg += hidden_gradient
+                # self.updateWeights(self.outGradientAvg/self.batchsize, self.hiddenGradientAvg/self.batchsize)
             else:
                 if np.argmax(prediction) == np.argmax(encoded_labels[i]):
-                    #print(np.argmax(prediction), np.argmax(encoded_labels[i]))
                     
                     self.count += 1
                 else:
                     pass
-                    #print(np.argmax(prediction), np.argmax(encoded_labels[i]))
-                #print("\n",prediction, encoded_labels[i])
             i += 1
         
         self.update_weights(self.outGradientAvg/len(input_data_batch), self.hiddenGradientAvg/len(input_data_batch))
@@ -185,100 +186,82 @@ class MultilayerPerceptron:
         print(" Error:", error_avg, end='', flush=True)
         return error_avg
 
-    def train(self, weights, bias, input_data, input_label):
+    def train(self, input_data, input_label):
         """
         Trains the network by iterating through all minibatches and through all epochs
         Randomly shuffles the data and splits it into minibatches
         """
 
-        #print("\n-------Training-------\n\nEpochs:", self.epochs, "- Batch Size:", self.batchsize, "- Learning Rate (\u03B7):", self.learningrate)
+        # print("\n-------Training-------\n\nEpochs:", self.epochs, "- Batch Size:", self.batchsize, "- Learning Rate (\u03B7):", self.learningrate)
         error = []
-        labeledData = list(zip(input_data, input_label))
-        if self.savePrediction == False:
-            np.random.shuffle(labeledData)
+        labeled_data = list(zip(input_data, input_label))
+        if not self.savePrediction:
+            np.random.shuffle(labeled_data)
 
-        input_data, input_label = zip(*labeledData)
+        input_data, input_label = zip(*labeled_data)
 
         # seperate data into batches
         input_data_batch = [input_data[x: x + self.batchsize] for x in np.arange(0, len(input_data), self.batchsize)]
-        input_label_batch = [input_label[x : x + self.batchsize] for x in np.arange(0, len(input_label), self.batchsize)]
+        input_label_batch = [input_label[x: x + self.batchsize] for x in np.arange(0, len(input_label), self.batchsize)]
 
         i = 0
         
         for row in input_data_batch:
             print("\rBatch:", i + 1, end=' -', flush=True)
-            error.append(self.minibatch(row, input_label_batch[i]))
+            error.append(self.mini_batch(row, input_label_batch[i]))
             i += 1
-        #plt.plot(error, color='black')
-        #plt.show()
+        # plt.plot(error, color='black')
+        # plt.show()
 
     def main(self):
         
         trainset = str(sys.argv[4])
         trainset_label = str(sys.argv[5])
         testset = str(sys.argv[6])
-        testlabel = str(sys.argv[8])
-        testset_predict = str(sys.argv[7])
+        testlabel = str(sys.argv[7])
+        # testset_predict = str(sys.argv[8])
         
         self.weights = {
-            'hidden1' : self.variable(1, 'weight'),
-            #'hidden2' : self.variable(2, 'weight'),
-            'out' : self.variable(len(layers) - 1, 'weight')
+            'hidden1': self.variable(1, 'weight'),
+            # 'hidden2' : self.variable(2, 'weight'),
+            'out': self.variable(len(layers) - 1, 'weight')
         }
         self.bias = {
-            'hidden1' : self.variable(1, 'bias'),
-            #'hidden2' : self.variable(2, 'bias'),
-            'out' : self.variable(len(layers) - 1, 'bias')
+            'hidden1': self.variable(1, 'bias'),
+            # 'hidden2' : self.variable(2, 'bias'),
+            'out': self.variable(len(layers) - 1, 'bias')
         }
         print("\nInput:", self.layers[0], "Hidden:", self.layers[1], "Output:", self.layers[-1])
         input_data_train, input_label_train = self.data(trainset, trainset_label)
         input_data_test, input_label_test = self.data(testset, testlabel)
         accuracy = []
+
         for epoch in range(self.epochs):
-                
-            
+
             self.count = 0
             print("\n-------Training-------")
             print("\nEpoch:", epoch + 1)
-            self.train(self.weights, self.bias, input_data_train, input_label_train)
+            self.train(input_data_train, input_label_train)
            
             print("\n\n-------Testing-------\n")            
             self.inference = True
-            self.train(self.weights, self.bias, input_data_test, input_label_test)
+            self.train(input_data_test, input_label_test)
             print("\nAccuracy", self.count/len(input_label_test))
             accuracy.append(self.count/len(input_data_test))
             self.inference = False
-        self.inference = True
-        self.savePrediction = True
-        input_data_test, input_label_test = self.data(testset, testlabel)
-        #self.train(self.weights, self.bias, input_data_test, input_label_test)
-        for i in range(len(input_data_test)):
-            prediction, x, y, z = self.feedforward(input_data_test[i])
-            self.predictionList.append(np.argmax(prediction))
-
-        if self.savePrediction == True:
-            with open('PredictDigitY.csv', 'w+') as file:
-                writer = csv.writer(file, lineterminator='\n')
-                for row in self.predictionList:
-                    writer.writerow([row])
             
         xaxis = [i for i in range(1, len(accuracy) + 1)]
         plt.plot(xaxis, accuracy, color='black')
         plt.xlabel('Epochs')
         plt.ylabel('Accuracy')
         plt.title('Epochs:30 - Batch Size: 10- Learning Rate:3')
+        plt.show()
 
-        # with open('TextData/quadBatch1.txt', 'a+') as file:
-        #     for row in accuracy:
-        #         file.write(str(np.max(accuracy)))
-        #         file.write('\n')
-        #file.flush()
-        #file.close()
-        #plt.show()
 
 if __name__ == '__main__':
+
     # network Parameters
-    epochs = 30
+    epochs = 2
     batchsize = 20
     learningrate = 3
     n_input = int(sys.argv[1])
