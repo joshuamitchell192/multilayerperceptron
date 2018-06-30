@@ -1,14 +1,19 @@
-import csv, gzip, random, sys, atexit, time, matplotlib.pyplot as plt, numpy as np, numpy.matlib
-from multiprocessing import cpu_count, Pool, Process
+import csv
+import gzip
+import matplotlib.pyplot as plt
+import numpy as np
+import random
+import sys
+from multiprocessing import cpu_count
+
 import activations
-from losses import quadratic, cross_entropy
+from losses import quadratic
 
 
-"""
-cmd : python neural_network.py 784 30 10 TrainDigitX.csv.gz TrainDigitY.csv.gz TestDigitX.csv.gz PredictDigitY.csv.gz
+# cmd : python neural_network.py 784 30 10 TrainDigitX.csv.gz TrainDigitY.csv.gz TestDigitX.csv.gz PredictDigitY.csv.gz
 
-cmd : python neural_network.py 784 30 10 TestDigitX.csv.gz TestDigitY.csv.gz TrainDigitX.csv.gz PredictDigitY.csv.gz
-"""
+# cmd : python neural_network.py 784 30 10 TestDigitX.csv.gz TestDigitY.csv.gz TrainDigitX.csv.gz PredictDigitY.csv.gz
+
 
 class MultilayerPerceptron:
     """
@@ -25,15 +30,18 @@ class MultilayerPerceptron:
         self.count = 0
         self.outGradientAvg = np.zeros((10, 30), dtype=float)
         self.hiddenGradientAvg = np.zeros((784, 30), dtype=float)
-        self.biasOutGradientAvg = np.zeros((10),dtype=float)
-        self.biasHiddenGradientAvg = np.zeros((10),dtype=float)
+        self.biasOutGradientAvg = np.zeros(10, dtype=float)
+        self.biasHiddenGradientAvg = np.zeros(10, dtype=float)
         self.predictionList = []
         self.main()
 
-    # key : 'weight' or 'bias'
     def data(self, trainset, trainset_label):
         """
         Reads in the data from files specified by command line arguments
+
+        :returns
+            input_data - The data for input to the network
+            input_label - The data's labels
         """
 
         print("\nReading Data...")
@@ -51,83 +59,84 @@ class MultilayerPerceptron:
         return input_data, input_label
 
     def variable(self, i, key):
+        """
+        Creates and returns matrices of weight and bias values
+        key values - 'weight' or 'bias'
+        """
         if key == 'weight':
             return np.array([[random.uniform(-1, 1) for i in range(self.layers[i])] for j in range(self.layers[i-1])])
         elif key == 'bias':
-            return np.array([random.uniform(-1, 1) for i in range(self.layers[i])])            
+            return np.array([random.uniform(-1, 1) for i in range(self.layers[i])])
+        else:
+            print("Incorrect key value passed to variable function. No matrix was returned.")
 
-    def onehotencoding(self, input_label_batch):
+    @staticmethod
+    def one_hot_encoding(self, input_label_batch):
         """
         Converts the label to one hot encoding
         return: one hot array of label
         """
-        encodedLabel = []
+        encoded_label = []
         for k in range(len(input_label_batch)):
             label = int(input_label_batch[k][0])
             temp = [0 for j in range(10)]
             temp[label] = 1
-            encodedLabel.append(temp)
+            encoded_label.append(temp)
 
-        return encodedLabel
+        return encoded_label
 
     def feedforward(self, inputs):
         """
         Feeds the input through the network layers to the softmax function
         """
         # Hidden Layer 1 
-        z1Sum = np.matmul(self.weights['hidden1'].T, inputs) + self.bias['hidden1']
-        z1 = activations.sigmoid(z1Sum, 'normal')
+        z1_sum = np.matmul(self.weights['hidden1'].T, inputs) + self.bias['hidden1']
+        z1 = activations.sigmoid(z1_sum, 'normal')
         
         # Hidden Layer 2
         #z2 = activations.sigmoid((np.einsum('ij, j->i', self.weights['hidden2'], z1) + self.bias['hidden2']), 'normal')
 
         # Output Layer
-        outsum = np.matmul( self.weights['out'].T, z1) + self.bias['out']
+        out_sum = np.matmul( self.weights['out'].T, z1) + self.bias['out']
         
-        prediction = activations.softmax(outsum, 'normal')
-        #self.predictionList.append(np.argmax(prediction))
-        #print(prediction)
-        
-        
-        return prediction, outsum, z1, z1Sum
+        prediction = activations.softmax(out_sum, 'normal')
 
-    def backpropagate(self, prediction, encodedLabels, outsum, z1, z1Sum, x):
-        '''
+        return prediction, out_sum, z1, z1_sum
+
+    def backpropagate(self, prediction, encoded_labels, h1, x):
+        """
         Applies the chain rule to backpropagate the network
-        '''
-        z1 = z1.reshape(self.layers[1], 1)
-        z1 = z1.T
+        """
+        h1 = h1.reshape(self.layers[1], 1)
+        h1 = h1.T
         x = np.array(x)
         x = x.reshape(self.layers[0], 1)
-        outDelta = np.multiply(quadratic(prediction, encodedLabels, 'derivative'), (prediction*(1 - prediction)))
+        out_delta = np.multiply(quadratic(prediction, encoded_labels, 'derivative'), (prediction * (1 - prediction)))
         
-        outDelta = outDelta.reshape(self.layers[-1], 1)
-        outGradient = self.learningrate*np.matmul(outDelta, z1)
-        z1 = z1.T
-        hiddenDelta = np.matmul(self.weights['out'], outDelta)*(z1*(1-z1))
-        hiddenGradient = self.learningrate*np.matmul(x,hiddenDelta.T)
+        out_delta = out_delta.reshape(self.layers[-1], 1)
+        out_gradient = self.learningrate*np.matmul(out_delta, h1)
+        h1 = h1.T
+        hidden_delta = np.matmul(self.weights['out'], out_delta)*(h1 * (1 - h1))
+        hidden_gradient = self.learningrate*np.matmul(x, hidden_delta.T)
 
-        return outGradient, hiddenGradient
+        return out_gradient, hidden_gradient
 
-    def updateWeights(self, outGradient, hiddenGradient):
-        outGradient = outGradient.T
-        #hiddenGradient = hiddenGradient.T
-        self.weights['out'] -= outGradient
-        self.weights['hidden1'] -= hiddenGradient
-        
+    def update_weights(self, out_gradient, hidden_gradient):
 
-        
+        out_gradient = out_gradient.T
+        self.weights['out'] -= out_gradient
+        self.weights['hidden1'] -= hidden_gradient
 
-    def minibatch(self, input_data_batch, input_label_batch):
+    def mini_batch(self, input_data_batch, input_label_batch):
         """
         Controls the process of feeding through and backpropagating the network by passing individual examples from the minibatch
         Calculates the error for each batch
         """
         cores = cpu_count()
-        encodedLabels = self.onehotencoding(input_label_batch)
+        encoded_labels = self.one_hot_encoding(input_label_batch)
         i = 0
         
-        errorAvg = 0
+        error_avg = 0
         gradientAvg = 0
         processes = []
         
@@ -140,40 +149,41 @@ class MultilayerPerceptron:
         '''if __name__ == '__main__':
             pool = Pool(processes=cpuCount)
             parallelBatch = pool.apply_async(self.feedforward, (input_data_batch,))
-            prediction, outsum, z1, z1Sum = parallelBatch.get(timeout=1)'''
+            prediction, outsum, h1, h1_sum = parallelBatch.get(timeout=1)'''
         #gradientAvg = np.zeros()
         self.outGradientAvg = np.zeros((self.layers[-1], self.layers[1]), dtype=float)
         self.hiddenGradientAvg = np.zeros((self.layers[0], self.layers[1]), dtype=float)
         self.biasOutGradientAvg = np.zeros((1,10),dtype=float)
         self.biasHiddenGradientAvg = np.zeros((30,),dtype=float)
+
         for row in input_data_batch:
             row = np.array(row)
             '''pool = Pool(processes=cpuCount)
             parallelBatch = pool.apply_async(self.feedforward, (input_data_batch,))
-            prediction, outsum, z1, z1Sum = parallelBatch.get(timeout=1)'''
-            prediction, outsum, z1, z1Sum = self.feedforward(row)
-            errorAvg += quadratic(prediction, encodedLabels[i], 'normal')
+            prediction, outsum, h1, h1_sum = parallelBatch.get(timeout=1)'''
+            prediction, outsum, h1, h1_sum = self.feedforward(row)
+            error_avg += quadratic(prediction, encoded_labels[i], 'normal')
             
             if self.inference == False:
-                outGradient, hiddenGradient = self.backpropagate(prediction, encodedLabels[i], outsum, z1, z1Sum, row)
+                outGradient, hiddenGradient = self.backpropagate(prediction, encoded_labels[i], h1, row)
                 self.outGradientAvg += outGradient
                 self.hiddenGradientAvg += hiddenGradient
                 #self.updateWeights(self.outGradientAvg/self.batchsize, self.hiddenGradientAvg/self.batchsize)
             else:
-                if np.argmax(prediction) == np.argmax(encodedLabels[i]):
-                    #print(np.argmax(prediction), np.argmax(encodedLabels[i]))
+                if np.argmax(prediction) == np.argmax(encoded_labels[i]):
+                    #print(np.argmax(prediction), np.argmax(encoded_labels[i]))
                     
                     self.count += 1
                 else:
                     pass
-                    #print(np.argmax(prediction), np.argmax(encodedLabels[i]))
-                #print("\n",prediction, encodedLabels[i])
+                    #print(np.argmax(prediction), np.argmax(encoded_labels[i]))
+                #print("\n",prediction, encoded_labels[i])
             i += 1
         
-        self.updateWeights(self.outGradientAvg/len(input_data_batch), self.hiddenGradientAvg/len(input_data_batch))
-        errorAvg = errorAvg / len(input_data_batch)
-        print(" Error:", errorAvg, end='', flush=True)
-        return errorAvg
+        self.update_weights(self.outGradientAvg/len(input_data_batch), self.hiddenGradientAvg/len(input_data_batch))
+        error_avg = error_avg / len(input_data_batch)
+        print(" Error:", error_avg, end='', flush=True)
+        return error_avg
 
     def train(self, weights, bias, input_data, input_label):
         """
@@ -201,6 +211,7 @@ class MultilayerPerceptron:
             i += 1
         #plt.plot(error, color='black')
         #plt.show()
+
     def main(self):
         
         trainset = str(sys.argv[4])
@@ -256,15 +267,14 @@ class MultilayerPerceptron:
         plt.xlabel('Epochs')
         plt.ylabel('Accuracy')
         plt.title('Epochs:30 - Batch Size: 10- Learning Rate:3')
-        '''with open('TextData/quadBatch1.txt', 'a+') as file:
-            for row in accuracy:
-                file.write(str(np.max(accuracy)) )
-                file.write('\n')'''
+
+        # with open('TextData/quadBatch1.txt', 'a+') as file:
+        #     for row in accuracy:
+        #         file.write(str(np.max(accuracy)))
+        #         file.write('\n')
         #file.flush()
         #file.close()
         #plt.show()
-
-
 
 if __name__ == '__main__':
     # network Parameters
