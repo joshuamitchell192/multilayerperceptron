@@ -12,7 +12,7 @@ from losses import quadratic
 
 # cmd : python neural_network.py 784 30 10 TrainDigitX.csv.gz TrainDigitY.csv.gz TestDigitX.csv.gz TestDigitY.csv.gz PredictDigitY.csv.gz
 
-# cmd : python neural_network.py 784 30 10 TestDigitX.csv.gz TestDigitY.csv.gz TrainDigitX.csv.gz PredictDigitY.csv.gz
+# cmd : python neural_network.py 784 30 10 TestDigitX.csv.gz TestDigitY.csv.gz TrainDigitX.csv.gz TrainDigitY.csv.gz PredictDigitY.csv.gz
 
 
 class MultilayerPerceptron:
@@ -35,7 +35,6 @@ class MultilayerPerceptron:
         self.biasOutGradientAvg = np.zeros(10, dtype=float)
         self.biasHiddenGradientAvg = np.zeros(10, dtype=float)
         self.predictionList = []
-        self.main()
 
     @staticmethod
     def data(trainset, trainset_label):
@@ -49,8 +48,8 @@ class MultilayerPerceptron:
 
         print("\nReading Data...")
 
-        # Trainset : 'TrainDigitX.csv.gz'
-        # Trainset_label : 'TrainDigitY.csv.gz'
+        # Train_set : 'TrainDigitX.csv.gz'
+        # Train_set_label : 'TrainDigitY.csv.gz'
         with gzip.open(trainset, 'rt') as csvfile:
             input_data = list(csv.reader(csvfile, delimiter=',', quoting=csv.QUOTE_NONNUMERIC))                
         print("\n", trainset, "100% -", len(input_data), ": instances")
@@ -213,12 +212,12 @@ class MultilayerPerceptron:
         # plt.plot(error, color='black')
         # plt.show()
 
-    def main(self):
+    def run(self):
         
-        trainset = str(sys.argv[4])
-        trainset_label = str(sys.argv[5])
-        testset = str(sys.argv[6])
-        testlabel = str(sys.argv[7])
+        train_set = str(sys.argv[4])
+        train_set_label = str(sys.argv[5])
+        test_set = str(sys.argv[6])
+        test_label = str(sys.argv[7])
         # testset_predict = str(sys.argv[8])
         
         self.weights = {
@@ -231,9 +230,9 @@ class MultilayerPerceptron:
             # 'hidden2' : self.variable(2, 'bias'),
             'out': self.variable(len(layers) - 1, 'bias')
         }
-        print("\nInput:", self.layers[0], "Hidden:", self.layers[1], "Output:", self.layers[-1])
-        input_data_train, input_label_train = self.data(trainset, trainset_label)
-        input_data_test, input_label_test = self.data(testset, testlabel)
+        print("\nInput:", self.layers[0], "\nHidden 1:", self.layers[1], "\nOutput:", self.layers[-1])
+        input_data_train, input_label_train = self.data(train_set, train_set_label)
+        input_data_test, input_label_test = self.data(test_set, test_label)
         accuracy = []
 
         for epoch in range(self.epochs):
@@ -246,6 +245,7 @@ class MultilayerPerceptron:
             print("\n\n-------Testing-------\n")            
             self.inference = True
             self.train(input_data_test, input_label_test)
+
             print("\nAccuracy", self.count/len(input_label_test))
             accuracy.append(self.count/len(input_data_test))
             self.inference = False
@@ -271,3 +271,4 @@ if __name__ == '__main__':
     layers = [n_input, n_hidden_1, n_output]
 
     mlp = MultilayerPerceptron(layers, epochs, batchsize, learningrate)
+    mlp.run()
