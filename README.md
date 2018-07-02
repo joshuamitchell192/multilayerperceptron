@@ -5,6 +5,12 @@ The network trains on 50 000 examples of handwritten digits and is tested on 10 
 
 ![alt text](mlprun.PNG "Example")
 
+To change the networks learning rate, batch size and number of epochs you can edit the values at the bottom of the neural_network.py files under the network parameters comment. 
+
+![alt text](parameters.PNG "Parameters")
+
+In order to increase the network capacity, you can change the networks number of hidden neurons when running the program with the command line argument at index 2.
+
 ## Dependancies
 You will need to be using python 3 and have numpy and matplotlib installed.
 
