@@ -9,6 +9,6 @@ The network trains on 50 000 examples of handwritten digits and is tested on 10 
 You will need to be using python 3 and have numpy and matplotlib installed.
 
 ## Usage
-To run this program, you need to run the neural_network.py file and pass the data files as command line arguments in the correct order. Use this:
+To run this program, you need to run the neural_network.py file and pass the data files as command line arguments in the correct order. Use this command line:
 
 python neural_network.py 784 30 10 TrainDigitX.csv.gz TrainDigitY.csv.gz TestDigitX.csv.gz TestDigitY.csv.gz PredictDigitY.csv.gz
