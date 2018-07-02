@@ -11,7 +11,7 @@ To change the networks learning rate, batch size and number of epochs you can ed
 
 In order to increase the network capacity, you can change the networks number of hidden neurons when running the program with the command line argument at index 2.
 
-## Dependancies
+## Dependencies
 You will need to be using python 3 and have numpy and matplotlib installed.
 
 ## Usage
