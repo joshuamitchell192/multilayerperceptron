@@ -261,7 +261,7 @@ class MultilayerPerceptron:
 if __name__ == '__main__':
 
     # network Parameters
-    epochs = 2
+    epochs = 20
     batchsize = 20
     learningrate = 3
     n_input = int(sys.argv[1])
