@@ -7,7 +7,19 @@ The network trains on 50 000 examples of handwritten digits and is tested on 10 
 
 To change the networks learning rate, batch size and number of epochs you can edit the values at the bottom of the neural_network.py files under the network parameters comment. 
 
-![alt text](parameters.PNG "Parameters")
+```python
+if __name__ == '__main__':
+
+    # network Parameters
+    epochs = 2
+    batchsize = 20
+    learningrate = 3
+    n_input = int(sys.argv[1])
+    n_hidden_1 = int(sys.argv[2])
+    n_hidden_2 = 30
+    n_output = int(sys.argv[3])
+    layers = [n_input, n_hidden_1, n_output]
+```
 
 In order to increase the network capacity, you can change the networks number of hidden neurons when running the program with the command line argument at index 2.
 
