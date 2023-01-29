@@ -29,11 +29,12 @@ class MultilayerPerceptron:
         self.bias = {}
         self.inference = False
         self.savePrediction = False
+        self.load_saved_weights = True
         self.count = 0
-        self.outGradientAvg = np.zeros((10, 30), dtype=float)
-        self.hiddenGradientAvg = np.zeros((784, 30), dtype=float)
-        self.biasOutGradientAvg = np.zeros(10, dtype=float)
-        self.biasHiddenGradientAvg = np.zeros(10, dtype=float)
+        self.outGradientAvg = np.zeros((10, 30), dtype=np.float16)
+        self.hiddenGradientAvg = np.zeros((784, 30), dtype=np.float16)
+        self.biasOutGradientAvg = np.zeros(10, dtype=np.float16)
+        self.biasHiddenGradientAvg = np.zeros(10, dtype=np.float16)
         self.predictionList = []
 
     @staticmethod
@@ -66,9 +67,9 @@ class MultilayerPerceptron:
         key values - 'weight' or 'bias'
         """
         if key == 'weight':
-            return np.array([[random.uniform(-1, 1) for i in range(self.layers[i])] for j in range(self.layers[i-1])])
+            return np.array([[random.uniform(-1, 1) for i in range(self.layers[i])] for j in range(self.layers[i-1])], dtype=np.float16)
         elif key == 'bias':
-            return np.array([random.uniform(-1, 1) for i in range(self.layers[i])])
+            return np.array([random.uniform(-1, 1) for i in range(self.layers[i])], dtype=np.float16)
         else:
             print("Incorrect key value passed to variable function. No matrix was returned.")
 
@@ -154,10 +155,10 @@ class MultilayerPerceptron:
             parallelBatch = pool.apply_async(self.feedforward, (input_data_batch,))
             prediction, outsum, h1, h1_sum = parallelBatch.get(timeout=1)'''
 
-        self.outGradientAvg = np.zeros((self.layers[-1], self.layers[1]), dtype=float)
-        self.hiddenGradientAvg = np.zeros((self.layers[0], self.layers[1]), dtype=float)
-        self.biasOutGradientAvg = np.zeros((1, 10), dtype=float)
-        self.biasHiddenGradientAvg = np.zeros((30,), dtype=float)
+        self.outGradientAvg = np.zeros((self.layers[-1], self.layers[1]), dtype=np.float16)
+        self.hiddenGradientAvg = np.zeros((self.layers[0], self.layers[1]), dtype=np.float16)
+        self.biasOutGradientAvg = np.zeros((1, 10), dtype=np.float16)
+        self.biasHiddenGradientAvg = np.zeros((30,), dtype=np.float16)
 
         for row in input_data_batch:
             row = np.array(row)
@@ -182,7 +183,7 @@ class MultilayerPerceptron:
         
         self.update_weights(self.outGradientAvg/len(input_data_batch), self.hiddenGradientAvg/len(input_data_batch))
         error_avg = error_avg / len(input_data_batch)
-        print(" Error:", error_avg, end='', flush=True)
+        # print(" Error:", error_avg, end='', flush=True)
         return error_avg
 
     def train(self, input_data, input_label):
@@ -220,16 +221,21 @@ class MultilayerPerceptron:
         test_label = str(sys.argv[7])
         # testset_predict = str(sys.argv[8])
         
-        self.weights = {
-            'hidden1': self.variable(1, 'weight'),
-            # 'hidden2' : self.variable(2, 'weight'),
-            'out': self.variable(len(layers) - 1, 'weight')
-        }
-        self.bias = {
-            'hidden1': self.variable(1, 'bias'),
-            # 'hidden2' : self.variable(2, 'bias'),
-            'out': self.variable(len(layers) - 1, 'bias')
-        }
+        if (self.load_saved_weights):
+            self.weights = self.load_weights("weights")
+            self.bias = self.load_weights("bias")
+        else:
+            self.weights = {
+                'hidden1': self.variable(1, 'weight'),
+                # 'hidden2' : self.variable(2, 'weight'),
+                'out': self.variable(len(layers) - 1, 'weight')
+            }
+            self.bias = {
+                'hidden1': self.variable(1, 'bias'),
+                # 'hidden2' : self.variable(2, 'bias'),
+                'out': self.variable(len(layers) - 1, 'bias')
+            }
+
         print("\nInput:", self.layers[0], "\nHidden 1:", self.layers[1], "\nOutput:", self.layers[-1])
         input_data_train, input_label_train = self.data(train_set, train_set_label)
         input_data_test, input_label_test = self.data(test_set, test_label)
@@ -249,6 +255,8 @@ class MultilayerPerceptron:
             print("\nAccuracy", self.count/len(input_label_test))
             accuracy.append(self.count/len(input_data_test))
             self.inference = False
+
+        self.save_weights(self.weights, self.bias)
             
         xaxis = [i for i in range(1, len(accuracy) + 1)]
         plt.plot(xaxis, accuracy, color='black')
@@ -257,6 +265,40 @@ class MultilayerPerceptron:
         plt.title('Epochs:30 - Batch Size: 10- Learning Rate:3')
         plt.show()
 
+    def load_weights(self, type):
+        if type == "weights":
+
+
+            with open("./saved_model/weights.npy", 'rb+') as file:
+
+                hidden1 = np.load(file, allow_pickle=True)
+                print(hidden1)
+                out = np.load(file, allow_pickle=True)
+                return {
+                    'hidden1': hidden1,
+                    # 'hidden2' : self.variable(2, 'weight'),
+                    'out': out
+                }
+
+        if type == "bias":
+            with open("./saved_model/bias.npy", 'rb+') as file:
+                hidden1 = np.load(file, allow_pickle=True)
+                out = np.load(file, allow_pickle=True)
+                return {
+                    'hidden1': hidden1,
+                    # 'hidden2' : self.variable(2, 'weight'),
+                    'out': out
+                }
+
+    def save_weights(self, weights, bias):
+        
+        with open("./saved_model/weights.npy", 'wb+') as file:
+            np.save(file, weights['hidden1'])
+            np.save(file, weights['out'])
+
+        with open("./saved_model/bias.npy", 'wb+') as file:
+            np.save(file, bias['hidden1'])
+            np.save(file, bias['out'])
 
 if __name__ == '__main__':
 
