@@ -14,20 +14,19 @@ from losses import quadratic
 
 # cmd : python neural_network.py 784 30 10 TestDigitX.csv.gz TestDigitY.csv.gz TrainDigitX.csv.gz TrainDigitY.csv.gz PredictDigitY.csv.gz
 
-
 class MultilayerPerceptron:
     """
     A neural network with fully connected layers.
     """
     
-    def __init__(self, layers, epochs, batchsize, learningrate):
+    def __init__(self, layers, epochs, batchsize, learningrate, inference = False):
         self.layers = layers
         self.epochs = epochs
         self.batchsize = batchsize
         self.learningrate = learningrate
         self.weights = {}
         self.bias = {}
-        self.inference = False
+        self.inference = inference
         self.savePrediction = False
         self.load_saved_weights = True
         self.count = 0
@@ -186,9 +185,9 @@ class MultilayerPerceptron:
         # print(" Error:", error_avg, end='', flush=True)
         return error_avg
 
-    def train(self, input_data, input_label):
+    def run_epoch(self, input_data, input_label):
         """
-        Trains the network by iterating through all minibatches and through all epochs
+        Trains the network by iterating through all minibatches and therefore a single iteration of the dataset
         Randomly shuffles the data and splits it into minibatches
         """
 
@@ -212,6 +211,26 @@ class MultilayerPerceptron:
             i += 1
         # plt.plot(error, color='black')
         # plt.show()
+
+    def train(self, training_data, training_labels, test_data, test_labels) -> list:
+        accuracy = []
+
+        for epoch in range(self.epochs):
+
+            self.count = 0
+            print("\n-------Training-------")
+            print("\nEpoch:", epoch + 1)
+            self.run_epoch(training_data, training_labels)
+           
+            print("\n\n-------Testing-------\n")            
+            self.inference = True
+            self.run_epoch(test_data, test_labels)
+
+            print("\nAccuracy", self.count/len(test_labels))
+            accuracy.append(self.count/len(test_data))
+            self.inference = False
+
+        return accuracy
 
     def run(self):
         
@@ -237,24 +256,10 @@ class MultilayerPerceptron:
             }
 
         print("\nInput:", self.layers[0], "\nHidden 1:", self.layers[1], "\nOutput:", self.layers[-1])
-        input_data_train, input_label_train = self.data(train_set, train_set_label)
-        input_data_test, input_label_test = self.data(test_set, test_label)
-        accuracy = []
+        training_data, training_labels = self.data(train_set, train_set_label)
+        test_data, test_labels = self.data(test_set, test_label)
 
-        for epoch in range(self.epochs):
-
-            self.count = 0
-            print("\n-------Training-------")
-            print("\nEpoch:", epoch + 1)
-            self.train(input_data_train, input_label_train)
-           
-            print("\n\n-------Testing-------\n")            
-            self.inference = True
-            self.train(input_data_test, input_label_test)
-
-            print("\nAccuracy", self.count/len(input_label_test))
-            accuracy.append(self.count/len(input_data_test))
-            self.inference = False
+        accuracy = self.train(training_data, training_labels, test_data, test_labels)
 
         self.save_weights(self.weights, self.bias)
             
